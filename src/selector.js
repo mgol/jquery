@@ -2,7 +2,6 @@ import { jQuery } from "./core.js";
 import { nodeName } from "./core/nodeName.js";
 import { document as preferredDoc } from "./var/document.js";
 import { indexOf } from "./var/indexOf.js";
-import { pop } from "./var/pop.js";
 import { push } from "./var/push.js";
 import { whitespace } from "./var/whitespace.js";
 import { rbuggyQSA } from "./selector/rbuggyQSA.js";
@@ -51,10 +50,7 @@ var i,
 	matchExpr = jQuery.extend( {
 
 		// For use in libraries implementing .is()
-		// We use this for POS matching in `select`
-		needsContext: new RegExp( "^" + whitespace +
-			"*[>+~]|:(even|odd|eq|gt|lt|nth|first|last)(?:\\(" + whitespace +
-			"*((?:-\\d)?\\d*)" + whitespace + "*\\)|)(?=[^-]|$)", "i" )
+		needsContext: new RegExp( "^" + whitespace + "*[>+~]", "i" )
 	}, filterMatchExpr ),
 
 	rinputs = /^(?:input|select|textarea|button)$/i,
@@ -315,8 +311,6 @@ jQuery.expr = {
 	// Can be adjusted by the user
 	cacheLength: 50,
 
-	createPseudo: markFunction,
-
 	match: matchExpr,
 
 	find: {
@@ -547,14 +541,11 @@ jQuery.expr = {
 			// pseudo-class names are case-insensitive
 			// https://www.w3.org/TR/selectors/#pseudo-classes
 			// Prioritize by case sensitivity in case custom pseudos are added with uppercase letters
-			// Remember that setFilters inherits from pseudos
-			var fn = jQuery.expr.pseudos[ pseudo ] ||
-				jQuery.expr.setFilters[ pseudo.toLowerCase() ] ||
-				selectorError( "unsupported pseudo: " + pseudo );
+			var fn = jQuery.expr.pseudos[ pseudo.toLowerCase() ] ||
+					selectorError( "unsupported pseudo: " + pseudo );
 
-			// The user may use createPseudo to indicate that
-			// arguments are needed to create the filter function
-			// just as jQuery does
+			// The function may be wrapped with markFunction, meaning
+			// arguments are needed to create the filter function.
 			if ( fn[ jQuery.expando ] ) {
 				return fn( argument );
 			}
@@ -720,11 +711,6 @@ for ( i in { submit: true, reset: true } ) {
 	jQuery.expr.pseudos[ i ] = createButtonPseudo( i );
 }
 
-// Easy API for creating new setFilters
-function setFilters() {}
-setFilters.prototype = jQuery.expr.pseudos;
-jQuery.expr.setFilters = new setFilters();
-
 function addCombinator( matcher, combinator, base ) {
 	var dir = combinator.dir,
 		skip = combinator.next,
@@ -801,137 +787,8 @@ function elementMatcher( matchers ) {
 		matchers[ 0 ];
 }
 
-function multipleContexts( selector, contexts, results ) {
-	var i = 0,
-		len = contexts.length;
-	for ( ; i < len; i++ ) {
-		find( selector, contexts[ i ], results );
-	}
-	return results;
-}
-
-function condense( unmatched, map, filter, context, xml ) {
-	var elem,
-		newUnmatched = [],
-		i = 0,
-		len = unmatched.length,
-		mapped = map != null;
-
-	for ( ; i < len; i++ ) {
-		if ( ( elem = unmatched[ i ] ) ) {
-			if ( !filter || filter( elem, context, xml ) ) {
-				newUnmatched.push( elem );
-				if ( mapped ) {
-					map.push( i );
-				}
-			}
-		}
-	}
-
-	return newUnmatched;
-}
-
-function setMatcher( preFilter, selector, matcher, postFilter, postFinder, postSelector ) {
-	if ( postFilter && !postFilter[ jQuery.expando ] ) {
-		postFilter = setMatcher( postFilter );
-	}
-	if ( postFinder && !postFinder[ jQuery.expando ] ) {
-		postFinder = setMatcher( postFinder, postSelector );
-	}
-	return markFunction( function( seed, results, context, xml ) {
-		var temp, i, elem, matcherOut,
-			preMap = [],
-			postMap = [],
-			preexisting = results.length,
-
-			// Get initial elements from seed or context
-			elems = seed ||
-				multipleContexts( selector || "*",
-					context.nodeType ? [ context ] : context, [] ),
-
-			// Prefilter to get matcher input, preserving a map for seed-results synchronization
-			matcherIn = preFilter && ( seed || !selector ) ?
-				condense( elems, preMap, preFilter, context, xml ) :
-				elems;
-
-		if ( matcher ) {
-
-			// If we have a postFinder, or filtered seed, or non-seed postFilter
-			// or preexisting results,
-			matcherOut = postFinder || ( seed ? preFilter : preexisting || postFilter ) ?
-
-				// ...intermediate processing is necessary
-				[] :
-
-				// ...otherwise use results directly
-				results;
-
-			// Find primary matches
-			matcher( matcherIn, matcherOut, context, xml );
-		} else {
-			matcherOut = matcherIn;
-		}
-
-		// Apply postFilter
-		if ( postFilter ) {
-			temp = condense( matcherOut, postMap );
-			postFilter( temp, [], context, xml );
-
-			// Un-match failing elements by moving them back to matcherIn
-			i = temp.length;
-			while ( i-- ) {
-				if ( ( elem = temp[ i ] ) ) {
-					matcherOut[ postMap[ i ] ] = !( matcherIn[ postMap[ i ] ] = elem );
-				}
-			}
-		}
-
-		if ( seed ) {
-			if ( postFinder || preFilter ) {
-				if ( postFinder ) {
-
-					// Get the final matcherOut by condensing this intermediate into postFinder contexts
-					temp = [];
-					i = matcherOut.length;
-					while ( i-- ) {
-						if ( ( elem = matcherOut[ i ] ) ) {
-
-							// Restore matcherIn since elem is not yet a final match
-							temp.push( ( matcherIn[ i ] = elem ) );
-						}
-					}
-					postFinder( null, ( matcherOut = [] ), temp, xml );
-				}
-
-				// Move matched elements from seed to results to keep them synchronized
-				i = matcherOut.length;
-				while ( i-- ) {
-					if ( ( elem = matcherOut[ i ] ) &&
-						( temp = postFinder ? indexOf.call( seed, elem ) : preMap[ i ] ) > -1 ) {
-
-						seed[ temp ] = !( results[ temp ] = elem );
-					}
-				}
-			}
-
-		// Add elements to results, through postFinder if defined
-		} else {
-			matcherOut = condense(
-				matcherOut === results ?
-					matcherOut.splice( preexisting, matcherOut.length ) :
-					matcherOut
-			);
-			if ( postFinder ) {
-				postFinder( null, results, matcherOut, xml );
-			} else {
-				push.apply( results, matcherOut );
-			}
-		}
-	} );
-}
-
 function matcherFromTokens( tokens ) {
-	var checkContext, matcher, j,
+	var checkContext, matcher,
 		len = tokens.length,
 		leadingRelative = jQuery.expr.relative[ tokens[ 0 ].type ],
 		implicitRelative = leadingRelative || jQuery.expr.relative[ " " ],
@@ -965,31 +822,6 @@ function matcherFromTokens( tokens ) {
 			matchers = [ addCombinator( elementMatcher( matchers ), matcher ) ];
 		} else {
 			matcher = jQuery.expr.filter[ tokens[ i ].type ].apply( null, tokens[ i ].matches );
-
-			// Return special upon seeing a positional matcher
-			if ( matcher[ jQuery.expando ] ) {
-
-				// Find the next relative operator (if any) for proper handling
-				j = ++i;
-				for ( ; j < len; j++ ) {
-					if ( jQuery.expr.relative[ tokens[ j ].type ] ) {
-						break;
-					}
-				}
-				return setMatcher(
-					i > 1 && elementMatcher( matchers ),
-					i > 1 && toSelector(
-
-						// If the preceding token was a descendant combinator, insert an implicit any-element `*`
-						tokens.slice( 0, i - 1 )
-							.concat( { value: tokens[ i - 2 ].type === " " ? "*" : "" } )
-					).replace( rtrimCSS, "$1" ),
-					matcher,
-					i < j && matcherFromTokens( tokens.slice( i, j ) ),
-					j < len && matcherFromTokens( ( tokens = tokens.slice( j ) ) ),
-					j < len && toSelector( tokens )
-				);
-			}
 			matchers.push( matcher );
 		}
 	}
@@ -997,122 +829,56 @@ function matcherFromTokens( tokens ) {
 	return elementMatcher( matchers );
 }
 
-function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
-	var bySet = setMatchers.length > 0,
-		byElement = elementMatchers.length > 0,
-		superMatcher = function( seed, context, xml, results, outermost ) {
-			var elem, j, matcher,
-				matchedCount = 0,
-				i = "0",
-				unmatched = seed && [],
-				setMatched = [],
-				contextBackup = outermostContext,
+function matcherFromGroupMatchers( elementMatchers ) {
+	return function( seed, context, xml, results, outermost ) {
+		var elem, j, matcher,
+			i = "0",
+			unmatched = seed && [],
+			contextBackup = outermostContext,
 
-				// We must always have either seed elements or outermost context
-				elems = seed || byElement && jQuery.expr.find.TAG( "*", outermost ),
+			// We must always have either seed elements or outermost context
+			elems = seed || jQuery.expr.find.TAG( "*", outermost ),
 
-				// Use integer dirruns iff this is the outermost matcher
-				dirrunsUnique = ( dirruns += contextBackup == null ? 1 : Math.random() || 0.1 );
+			// Use integer dirruns iff this is the outermost matcher
+			dirrunsUnique = ( dirruns += contextBackup == null ? 1 : Math.random() || 0.1 );
 
-			if ( outermost ) {
-				outermostContext = context === document || context || outermost;
-			}
+		if ( outermost ) {
+			outermostContext = context === document || context || outermost;
+		}
 
-			// Add elements passing elementMatchers directly to results
-			for ( ; ( elem = elems[ i ] ) != null; i++ ) {
-				if ( byElement && elem ) {
-					j = 0;
-
-					if ( !context && elem.ownerDocument !== document ) {
-						setDocument( elem );
-						xml = !documentIsHTML;
-					}
-					while ( ( matcher = elementMatchers[ j++ ] ) ) {
-						if ( matcher( elem, context || document, xml ) ) {
-							push.call( results, elem );
-							break;
-						}
-					}
-					if ( outermost ) {
-						dirruns = dirrunsUnique;
-					}
-				}
-
-				// Track unmatched elements for set filters
-				if ( bySet ) {
-
-					// They will have gone through all possible matchers
-					if ( ( elem = !matcher && elem ) ) {
-						matchedCount--;
-					}
-
-					// Lengthen the array for every element, matched or not
-					if ( seed ) {
-						unmatched.push( elem );
-					}
-				}
-			}
-
-			// `i` is now the count of elements visited above, and adding it to `matchedCount`
-			// makes the latter nonnegative.
-			matchedCount += i;
-
-			// Apply set filters to unmatched elements
-			// NOTE: This can be skipped if there are no unmatched elements (i.e., `matchedCount`
-			// equals `i`), unless we didn't visit _any_ elements in the above loop because we have
-			// no element matchers and no seed.
-			// Incrementing an initially-string "0" `i` allows `i` to remain a string only in that
-			// case, which will result in a "00" `matchedCount` that differs from `i` but is also
-			// numerically zero.
-			if ( bySet && i !== matchedCount ) {
+		// Add elements passing elementMatchers directly to results
+		for ( ; ( elem = elems[ i ] ) != null; i++ ) {
+			if ( elem ) {
 				j = 0;
-				while ( ( matcher = setMatchers[ j++ ] ) ) {
-					matcher( unmatched, setMatched, context, xml );
+
+				if ( !context && elem.ownerDocument !== document ) {
+					setDocument( elem );
+					xml = !documentIsHTML;
 				}
-
-				if ( seed ) {
-
-					// Reintegrate element matches to eliminate the need for sorting
-					if ( matchedCount > 0 ) {
-						while ( i-- ) {
-							if ( !( unmatched[ i ] || setMatched[ i ] ) ) {
-								setMatched[ i ] = pop.call( results );
-							}
-						}
+				while ( ( matcher = elementMatchers[ j++ ] ) ) {
+					if ( matcher( elem, context || document, xml ) ) {
+						push.call( results, elem );
+						break;
 					}
-
-					// Discard index placeholder values to get only actual matches
-					setMatched = condense( setMatched );
 				}
-
-				// Add matches to results
-				push.apply( results, setMatched );
-
-				// Seedless set matches succeeding multiple successful matchers stipulate sorting
-				if ( outermost && !seed && setMatched.length > 0 &&
-					( matchedCount + setMatchers.length ) > 1 ) {
-
-					jQuery.uniqueSort( results );
+				if ( outermost ) {
+					dirruns = dirrunsUnique;
 				}
 			}
+		}
 
-			// Override manipulation of globals by nested matchers
-			if ( outermost ) {
-				dirruns = dirrunsUnique;
-				outermostContext = contextBackup;
-			}
+		// Override manipulation of globals by nested matchers
+		if ( outermost ) {
+			dirruns = dirrunsUnique;
+			outermostContext = contextBackup;
+		}
 
-			return unmatched;
-		};
-
-	return bySet ?
-		markFunction( superMatcher ) :
-		superMatcher;
+		return unmatched;
+	};
 }
 
 function compile( selector, match /* Internal Use Only */ ) {
 	var i,
-		setMatchers = [],
 		elementMatchers = [],
 		cached = compilerCache[ selector + " " ];
 
@@ -1124,17 +890,12 @@ function compile( selector, match /* Internal Use Only */ ) {
 		}
 		i = match.length;
 		while ( i-- ) {
-			cached = matcherFromTokens( match[ i ] );
-			if ( cached[ jQuery.expando ] ) {
-				setMatchers.push( cached );
-			} else {
-				elementMatchers.push( cached );
-			}
+			elementMatchers.push( matcherFromTokens( match[ i ] ) );
 		}
 
 		// Cache the compiled function
 		cached = compilerCache( selector,
-			matcherFromGroupMatchers( elementMatchers, setMatchers ) );
+			matcherFromGroupMatchers( elementMatchers ) );
 
 		// Save selector and tokenization
 		cached.selector = selector;
