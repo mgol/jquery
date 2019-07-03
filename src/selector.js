@@ -272,28 +272,6 @@ function createDisabledPseudo( disabled ) {
 }
 
 /**
- * Returns a function to use in pseudos for positionals
- * @param {Function} fn
- */
-function createPositionalPseudo( fn ) {
-	return markFunction( function( argument ) {
-		argument = +argument;
-		return markFunction( function( seed, matches ) {
-			var j,
-				matchIndexes = fn( [], seed.length, argument ),
-				i = matchIndexes.length;
-
-			// Match elements found at the specified indexes
-			while ( i-- ) {
-				if ( seed[ ( j = matchIndexes[ i ] ) ] ) {
-					seed[ j ] = !( matches[ j ] = seed[ j ] );
-				}
-			}
-		} );
-	} );
-}
-
-/**
  * Sets document-related variables once based on the current document
  * @param {Element|Object} [node] An element or document object to use to set the document
  */
@@ -730,65 +708,9 @@ jQuery.expr = {
 
 		text: function( elem ) {
 			return nodeName( elem, "input" ) && elem.type === "text";
-		},
-
-		// Position-in-collection
-		first: createPositionalPseudo( function() {
-			return [ 0 ];
-		} ),
-
-		last: createPositionalPseudo( function( _matchIndexes, length ) {
-			return [ length - 1 ];
-		} ),
-
-		eq: createPositionalPseudo( function( _matchIndexes, length, argument ) {
-			return [ argument < 0 ? argument + length : argument ];
-		} ),
-
-		even: createPositionalPseudo( function( matchIndexes, length ) {
-			var i = 0;
-			for ( ; i < length; i += 2 ) {
-				matchIndexes.push( i );
-			}
-			return matchIndexes;
-		} ),
-
-		odd: createPositionalPseudo( function( matchIndexes, length ) {
-			var i = 1;
-			for ( ; i < length; i += 2 ) {
-				matchIndexes.push( i );
-			}
-			return matchIndexes;
-		} ),
-
-		lt: createPositionalPseudo( function( matchIndexes, length, argument ) {
-			var i;
-
-			if ( argument < 0 ) {
-				i = argument + length;
-			} else if ( argument > length ) {
-				i = length;
-			} else {
-				i = argument;
-			}
-
-			for ( ; --i >= 0; ) {
-				matchIndexes.push( i );
-			}
-			return matchIndexes;
-		} ),
-
-		gt: createPositionalPseudo( function( matchIndexes, length, argument ) {
-			var i = argument < 0 ? argument + length : argument;
-			for ( ; ++i < length; ) {
-				matchIndexes.push( i );
-			}
-			return matchIndexes;
-		} )
+		}
 	}
 };
-
-jQuery.expr.pseudos.nth = jQuery.expr.pseudos.eq;
 
 // Add button/input type pseudos
 for ( i in { radio: true, checkbox: true, file: true, password: true, image: true } ) {
