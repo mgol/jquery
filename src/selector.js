@@ -51,10 +51,7 @@ var i,
 	matchExpr = jQuery.extend( {
 
 		// For use in libraries implementing .is()
-		// We use this for POS matching in `select`
-		needsContext: new RegExp( "^" + whitespace +
-			"*[>+~]|:(even|odd|eq|gt|lt|nth|first|last)(?:\\(" + whitespace +
-			"*((?:-\\d)?\\d*)" + whitespace + "*\\)|)(?=[^-]|$)", "i" )
+		needsContext: new RegExp( "^" + whitespace + "*[>+~]", "i" )
 	}, filterMatchExpr ),
 
 	rinputs = /^(?:input|select|textarea|button)$/i,
@@ -315,8 +312,6 @@ jQuery.expr = {
 	// Can be adjusted by the user
 	cacheLength: 50,
 
-	createPseudo: markFunction,
-
 	match: matchExpr,
 
 	find: {
@@ -547,14 +542,11 @@ jQuery.expr = {
 			// pseudo-class names are case-insensitive
 			// https://www.w3.org/TR/selectors/#pseudo-classes
 			// Prioritize by case sensitivity in case custom pseudos are added with uppercase letters
-			// Remember that setFilters inherits from pseudos
-			var fn = jQuery.expr.pseudos[ pseudo ] ||
-				jQuery.expr.setFilters[ pseudo.toLowerCase() ] ||
-				selectorError( "unsupported pseudo: " + pseudo );
+			var fn = jQuery.expr.pseudos[ pseudo.toLowerCase() ] ||
+					selectorError( "unsupported pseudo: " + pseudo );
 
-			// The user may use createPseudo to indicate that
-			// arguments are needed to create the filter function
-			// just as jQuery does
+			// The function may be wrapped with markFunction, meaning
+			// arguments are needed to create the filter function.
 			if ( fn[ jQuery.expando ] ) {
 				return fn( argument );
 			}
@@ -720,11 +712,6 @@ for ( i in { submit: true, reset: true } ) {
 	jQuery.expr.pseudos[ i ] = createButtonPseudo( i );
 }
 
-// Easy API for creating new setFilters
-function setFilters() {}
-setFilters.prototype = jQuery.expr.pseudos;
-jQuery.expr.setFilters = new setFilters();
-
 function addCombinator( matcher, combinator, base ) {
 	var dir = combinator.dir,
 		skip = combinator.next,
@@ -801,15 +788,6 @@ function elementMatcher( matchers ) {
 		matchers[ 0 ];
 }
 
-function multipleContexts( selector, contexts, results ) {
-	var i = 0,
-		len = contexts.length;
-	for ( ; i < len; i++ ) {
-		find( selector, contexts[ i ], results );
-	}
-	return results;
-}
-
 function condense( unmatched, map, filter, context, xml ) {
 	var elem,
 		newUnmatched = [],
@@ -831,107 +809,8 @@ function condense( unmatched, map, filter, context, xml ) {
 	return newUnmatched;
 }
 
-function setMatcher( preFilter, selector, matcher, postFilter, postFinder, postSelector ) {
-	if ( postFilter && !postFilter[ jQuery.expando ] ) {
-		postFilter = setMatcher( postFilter );
-	}
-	if ( postFinder && !postFinder[ jQuery.expando ] ) {
-		postFinder = setMatcher( postFinder, postSelector );
-	}
-	return markFunction( function( seed, results, context, xml ) {
-		var temp, i, elem, matcherOut,
-			preMap = [],
-			postMap = [],
-			preexisting = results.length,
-
-			// Get initial elements from seed or context
-			elems = seed ||
-				multipleContexts( selector || "*",
-					context.nodeType ? [ context ] : context, [] ),
-
-			// Prefilter to get matcher input, preserving a map for seed-results synchronization
-			matcherIn = preFilter && ( seed || !selector ) ?
-				condense( elems, preMap, preFilter, context, xml ) :
-				elems;
-
-		if ( matcher ) {
-
-			// If we have a postFinder, or filtered seed, or non-seed postFilter
-			// or preexisting results,
-			matcherOut = postFinder || ( seed ? preFilter : preexisting || postFilter ) ?
-
-				// ...intermediate processing is necessary
-				[] :
-
-				// ...otherwise use results directly
-				results;
-
-			// Find primary matches
-			matcher( matcherIn, matcherOut, context, xml );
-		} else {
-			matcherOut = matcherIn;
-		}
-
-		// Apply postFilter
-		if ( postFilter ) {
-			temp = condense( matcherOut, postMap );
-			postFilter( temp, [], context, xml );
-
-			// Un-match failing elements by moving them back to matcherIn
-			i = temp.length;
-			while ( i-- ) {
-				if ( ( elem = temp[ i ] ) ) {
-					matcherOut[ postMap[ i ] ] = !( matcherIn[ postMap[ i ] ] = elem );
-				}
-			}
-		}
-
-		if ( seed ) {
-			if ( postFinder || preFilter ) {
-				if ( postFinder ) {
-
-					// Get the final matcherOut by condensing this intermediate into postFinder contexts
-					temp = [];
-					i = matcherOut.length;
-					while ( i-- ) {
-						if ( ( elem = matcherOut[ i ] ) ) {
-
-							// Restore matcherIn since elem is not yet a final match
-							temp.push( ( matcherIn[ i ] = elem ) );
-						}
-					}
-					postFinder( null, ( matcherOut = [] ), temp, xml );
-				}
-
-				// Move matched elements from seed to results to keep them synchronized
-				i = matcherOut.length;
-				while ( i-- ) {
-					if ( ( elem = matcherOut[ i ] ) &&
-						( temp = postFinder ? indexOf.call( seed, elem ) : preMap[ i ] ) > -1 ) {
-
-						seed[ temp ] = !( results[ temp ] = elem );
-					}
-				}
-			}
-
-		// Add elements to results, through postFinder if defined
-		} else {
-			matcherOut = condense(
-				matcherOut === results ?
-					matcherOut.splice( preexisting, matcherOut.length ) :
-					matcherOut
-			);
-			if ( postFinder ) {
-				postFinder( null, results, matcherOut, xml );
-			} else {
-				push.apply( results, matcherOut );
-			}
-		}
-	} );
-}
-
 function matcherFromTokens( tokens ) {
-	var checkContext, matcher, j,
+	var checkContext, matcher,
 		len = tokens.length,
 		leadingRelative = jQuery.expr.relative[ tokens[ 0 ].type ],
 		implicitRelative = leadingRelative || jQuery.expr.relative[ " " ],
@@ -965,31 +844,6 @@ function matcherFromTokens( tokens ) {
 			matchers = [ addCombinator( elementMatcher( matchers ), matcher ) ];
 		} else {
 			matcher = jQuery.expr.filter[ tokens[ i ].type ].apply( null, tokens[ i ].matches );
-
-			// Return special upon seeing a positional matcher
-			if ( matcher[ jQuery.expando ] ) {
-
-				// Find the next relative operator (if any) for proper handling
-				j = ++i;
-				for ( ; j < len; j++ ) {
-					if ( jQuery.expr.relative[ tokens[ j ].type ] ) {
-						break;
-					}
-				}
-				return setMatcher(
-					i > 1 && elementMatcher( matchers ),
-					i > 1 && toSelector(
-
-						// If the preceding token was a descendant combinator, insert an implicit any-element `*`
-						tokens.slice( 0, i - 1 )
-							.concat( { value: tokens[ i - 2 ].type === " " ? "*" : "" } )
-					).replace( rtrimCSS, "$1" ),
-					matcher,
-					i < j && matcherFromTokens( tokens.slice( i, j ) ),
-					j < len && matcherFromTokens( ( tokens = tokens.slice( j ) ) ),
-					j < len && toSelector( tokens )
-				);
-			}
 			matchers.push( matcher );
 		}
 	}
