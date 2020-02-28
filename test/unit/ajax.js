@@ -3245,6 +3245,189 @@ QUnit.module( "ajax", {
 		};
 	} );
 
+//----------- jQuery.ajaxTransport() completeCallback object API
+
+	ajaxTest( "jQuery.ajaxTransport() - completeCallback with object argument", 4,
+			function( assert ) {
+		var testId = assert.test.testId,
+			dataType = "test-obj-cb-" + testId,
+			resp = {};
+		resp[ dataType ] = "custom response";
+		return {
+			setup: function() {
+				jQuery.ajaxTransport( dataType, function() {
+					return {
+						send: function( _, completeCallback ) {
+							completeCallback( {
+								status: 200,
+								statusText: "OK",
+								responses: resp
+							} );
+						},
+						abort: jQuery.noop
+					};
+				} );
+			},
+			url: url( "name.html" ),
+			dataType: dataType,
+			success: function( data, textStatus, jqXHR ) {
+				assert.strictEqual( data, "custom response",
+					"Success callback received the custom transport response" );
+				assert.strictEqual( textStatus, "success",
+					"textStatus is 'success'" );
+				assert.strictEqual( jqXHR.status, 200,
+					"jqXHR.status is 200" );
+				assert.strictEqual( jqXHR.statusText, "OK",
+					"jqXHR.statusText is 'OK'" );
+			}
+		};
+	} );
+
+	ajaxTest( "jQuery.ajaxTransport() - completeCallback object with status and statusText only",
+			2, function( assert ) {
+		var testId = assert.test.testId,
+			dataType = "test-obj-err-" + testId;
+		return {
+			setup: function() {
+				jQuery.ajaxTransport( dataType, function() {
+					return {
+						send: function( _, completeCallback ) {
+							completeCallback( {
+								status: 404,
+								statusText: "Not Found"
+							} );
+						},
+						abort: jQuery.noop
+					};
+				} );
+			},
+			url: url( "name.html" ),
+			dataType: dataType,
+			error: function( jqXHR, textStatus ) {
+				assert.strictEqual( jqXHR.status, 404,
+					"jqXHR.status is 404" );
+				assert.strictEqual( textStatus, "error",
+					"textStatus is 'error'" );
+			}
+		};
+	} );
+
+	ajaxTest(
+		"jQuery.ajaxTransport() - completeCallback object with custom status and response headers",
+		4, function( assert ) {
+		var testId = assert.test.testId,
+			dataType = "test-obj-hdr-" + testId,
+			resp = {};
+		resp[ dataType ] = "created";
+		return {
+			setup: function() {
+				jQuery.ajaxTransport( dataType, function() {
+					return {
+						send: function( _, completeCallback ) {
+							completeCallback( {
+								status: 201,
+								statusText: "Created",
+								responses: resp,
+								headers: "X-Custom: test-value"
+							} );
+						},
+						abort: jQuery.noop
+					};
+				} );
+			},
+			url: url( "name.html" ),
+			dataType: dataType,
+			success: function( data, textStatus, jqXHR ) {
+				assert.strictEqual( jqXHR.status, 201,
+					"jqXHR.status is the custom status code" );
+				assert.strictEqual( textStatus, "success",
+					"textStatus is 'success'" );
+				assert.strictEqual( data, "created",
+					"Response data was received" );
+				assert.strictEqual( jqXHR.getResponseHeader( "X-Custom" ), "test-value",
+					"Custom response header is accessible" );
+			}
+		};
+	} );
+
+	ajaxTest(
+		"jQuery.ajaxTransport() - completeCallback object produces same result as positional args",
+		10, function( assert ) {
+		var testId = assert.test.testId,
+			dataTypePositional = "test-pos-" + testId,
+			dataTypeObject = "test-obj-" + testId,
+			respPositional = {},
+			respObject = {};
+		respPositional[ dataTypePositional ] = "response data";
+		respObject[ dataTypeObject ] = "response data";
+		return {
+			setup: function() {
+				jQuery.ajaxTransport( dataTypePositional, function() {
+					return {
+						send: function( _, completeCallback ) {
+							completeCallback(
+								201,
+								"Created",
+								respPositional,
+								"X-Custom: test-value"
+							);
+						},
+						abort: jQuery.noop
+					};
+				} );
+				jQuery.ajaxTransport( dataTypeObject, function() {
+					return {
+						send: function( _, completeCallback ) {
+							completeCallback( {
+								status: 201,
+								statusText: "Created",
+								responses: respObject,
+								headers: "X-Custom: test-value"
+							} );
+						},
+						abort: jQuery.noop
+					};
+				} );
+			},
+			requests: [
+				{
+					url: url( "name.html" ),
+					dataType: dataTypePositional,
+					success: function( data, textStatus, jqXHR ) {
+						assert.strictEqual( jqXHR.status, 201,
+							"Positional: jqXHR.status" );
+						assert.strictEqual( jqXHR.statusText, "Created",
+							"Positional: jqXHR.statusText" );
+						assert.strictEqual( textStatus, "success",
+							"Positional: textStatus" );
+						assert.strictEqual( data, "response data",
+							"Positional: response data" );
+						assert.strictEqual(
+							jqXHR.getResponseHeader( "X-Custom" ), "test-value",
+							"Positional: response header" );
+					}
+				},
+				{
+					url: url( "name.html" ),
+					dataType: dataTypeObject,
+					success: function( data, textStatus, jqXHR ) {
+						assert.strictEqual( jqXHR.status, 201,
+							"Object: jqXHR.status" );
+						assert.strictEqual( jqXHR.statusText, "Created",
+							"Object: jqXHR.statusText" );
+						assert.strictEqual( textStatus, "success",
+							"Object: textStatus" );
+						assert.strictEqual( data, "response data",
+							"Object: response data" );
+						assert.strictEqual(
+							jqXHR.getResponseHeader( "X-Custom" ), "test-value",
+							"Object: response header" );
+					}
+				}
+			]
+		};
+	} );
+
 //----------- jQuery.ajaxSetup()
 
 	QUnit.test( "jQuery.ajaxSetup()", function( assert ) {
