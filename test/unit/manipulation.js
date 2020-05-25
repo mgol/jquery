@@ -2996,3 +2996,35 @@ QUnit.test( "Works with invalid attempts to close the table wrapper", function( 
 	assert.strictEqual( elem[ 0 ].nodeName.toLowerCase(), "td", "First element is td" );
 	assert.strictEqual( elem[ 1 ].nodeName.toLowerCase(), "td", "Second element is td" );
 } );
+
+// Test trustedTypes support in browsers where they're supported (currently Chrome 83+).
+// TODO does this needs to be an iframe script?
+QUnit[
+	typeof trustedTypes === "undefined" ? "skip" : "test"
+]( "Works with trusted types", function( assert ) {
+	assert.expect( 4 );
+
+	var i, input, elem, tags,
+		policy = trustedTypes.createPolicy( "jquery-test-policy", {
+			createHTML: function( html ) {
+				return html;
+			}
+		} ),
+		inputs = [
+			[ "<div></div>", "<div class='test'></div>", [ "div" ] ],
+			[ "<div></div>", "<div class='test'></div><span class='test'></span>",
+				[ "div", "span" ] ],
+			[ "<table></table>", "<td class='test'></td>", [ "td" ] ],
+			[ "<select></select>", "<option class='test'></option>", [ "option" ] ]
+		];
+
+	for ( i = 0; i < inputs.length; i++ ) {
+		input = inputs[ i ];
+		elem = jQuery( policy.createHTML( input[ 0 ] ) );
+		elem.append( policy.createHTML( input[ 1 ] ) );
+		tags = elem.find( ".test" ).toArray().map( function( node ) {
+			return node.nodeName.toLowerCase();
+		} );
+		assert.deepEqual( tags, input[ 2 ], input[ 2 ].join( ", " ) );
+	}
+} );
