@@ -74,7 +74,6 @@
     "test:chrome": "npm run pretest && npm run build:main && npm run test:unit -- -v -b chrome -h",
     "test:edge": "npm run pretest && npm run build:main && npm run test:unit -- -v -b edge -h",
     "test:firefox": "npm run pretest && npm run build:main && npm run test:unit -- -v -b firefox -h",
-    "test:ie": "npm run pretest && npm run build:main && npm run test:unit -- -v -b ie",
     "test:safari": "npm run pretest && npm run build:main && npm run test:unit -- -b safari",
     "test:server": "node test/runner/server.js",
     "test:esm": "npm run pretest && npm run build:main && npm run test:unit -- --esm -h",
