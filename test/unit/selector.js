@@ -2129,7 +2129,7 @@ QUnit.test( "jQuery.escapeSelector", function( assert ) {
 	assert.equal( jQuery.escapeSelector( "\uD834" ), "\uD834", "Doesn't escape lone high surrogate" );
 } );
 
-QUnit[ QUnit.jQuerySelectors ? "test" : "skip" ]( "custom pseudos", function( assert ) {
+QUnit[ QUnit.jQuerySelectorsPos ? "test" : "skip" ]( "custom pseudos", function( assert ) {
 	assert.expect( 6 );
 
 	try {
