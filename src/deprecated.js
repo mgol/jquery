@@ -4,6 +4,8 @@ import { slice } from "./var/slice.js";
 import "./deprecated/ajax-event-alias.js";
 import "./deprecated/event.js";
 
+jQuery.escapeSelector = window.CSS.escape;
+
 // Bind a function to a context, optionally partially applying any
 // arguments.
 // jQuery.proxy is deprecated to promote standards (specifically Function#bind)
