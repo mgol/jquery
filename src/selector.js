@@ -23,7 +23,6 @@ import { toSelector } from "./selector/toSelector.js";
 
 // The following utils are attached directly to the jQuery object.
 import "./attributes/attr.js"; // jQuery.attr
-import "./selector/escapeSelector.js";
 import "./selector/uniqueSort.js";
 
 var i,
@@ -156,7 +155,7 @@ function find( selector, context, results, seed ) {
 
 						// Capture the context ID, setting it first if necessary
 						if ( ( nid = context.getAttribute( "id" ) ) ) {
-							nid = jQuery.escapeSelector( nid );
+							nid = window.CSS.escape( nid );
 						} else {
 							context.setAttribute( "id", ( nid = jQuery.expando ) );
 						}
