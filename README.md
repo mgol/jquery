@@ -1,5 +1,7 @@
 # [jQuery](https://jquery.com/) — New Wave JavaScript
 
+Hi!
+
 Meetings are currently held on the [matrix.org platform](https://matrix.to/#/#jquery_meeting:gitter.im).
 
 Meeting minutes can be found at [meetings.jquery.org](https://meetings.jquery.org/category/core/).
