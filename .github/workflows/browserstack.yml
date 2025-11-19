@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 3.x-stable
+      - 3.x-test-outside-view-position-fix-test
 
 jobs:
   test:
