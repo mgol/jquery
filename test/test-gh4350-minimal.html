@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en" id="html">
+<head>
+    <meta charset="utf-8">
+    <title>Minimal gh-4350 Test</title>
+    <!-- Exactly like QUnit test/index.html -->
+    <script src="data/jquery-3.7.1.js"></script>
+    <script src="../external/qunit/qunit.js"></script>
+    <script src="../dist/jquery.js"></script>
+    <style>
+        pre { background: #f0f0f0; padding: 10px; font-size: 12px; }
+        .highlight { background: yellow; }
+        .error { background: #fcc; }
+    </style>
+</head>
+<body>
+    <h2>Minimal gh-4350 Test (with QUnit fixture)</h2>
+    <button id="runBtn">Run Test</button>
+    <div id="output"></div>
+    
+    <!-- Exact QUnit fixture HTML for #name -->
+    <div id="qunit-fixture">
+        <form id="form" action="formaction">
+            <input type="text" id="name" name="name" value="name" />
+        </form>
+    </div>
+    
+    <script>
+    // Use the loaded jQuery (dist/jquery.js)
+    var $ = jQuery;
+    var log = [];
+    var $output = $("#output");
+    
+    function addLog(msg, isError) {
+        log.push({ msg: msg, error: isError });
+        var html = log.map(function(item) {
+            var cls = item.error ? 'error' : (item.msg.indexOf("FOCUS") > -1 ? 'highlight' : '');
+            return cls ? '<span class="' + cls + '">' + item.msg + '</span>' : item.msg;
+        }).join("\n");
+        $output.html("<pre>" + html + "</pre>");
+        console.log(msg);
+    }
+    
+    $("#runBtn").on("click", function() {
+        log = [];
+        
+        var remaining = 3;
+        var input = $("#name");
+        var focusCount = 0;
+        var blurCount = 0;
+        
+        // Clear any existing handlers and data
+        input.off();
+        
+        addLog("Setting up handlers...");
+        addLog("Input element: " + input[0].tagName + " id=" + input[0].id);
+        
+        input
+            .on("focus", function(e) {
+                focusCount++;
+                remaining--;
+                addLog(">>> FOCUS #" + focusCount + " (remaining=" + remaining + ", isTrigger=" + e.isTrigger + ") <<<");
+                
+                if (remaining > 0) {
+                    addLog("  Triggering blur...");
+                    input.trigger("blur");
+                    addLog("  blur returned");
+                } else if (remaining === 0) {
+                    addLog("  DONE (remaining=0)");
+                } else {
+                    addLog("  ERROR: remaining=" + remaining, true);
+                }
+            })
+            .on("blur", function(e) {
+                blurCount++;
+                addLog("  Blur #" + blurCount + " (isTrigger=" + e.isTrigger + ")");
+                setTimeout(function() {
+                    addLog("  setTimeout -> triggering focus...");
+                    input.trigger("focus");
+                    addLog("  focus returned");
+                }, 10);
+            });
+        
+        addLog("Initial trigger('focus')...");
+        input.trigger("focus");
+        addLog("Initial trigger returned");
+        
+        setTimeout(function() {
+            addLog("\n=== RESULT ===");
+            addLog("Focus count: " + focusCount + " (expected 3)");
+            addLog("Blur count: " + blurCount + " (expected 3)");
+            if (focusCount === 3) {
+                addLog("PASSED");
+            } else {
+                addLog("FAILED", true);
+            }
+        }, 500);
+    });
+    
+    // Auto-run
+    setTimeout(function() { $("#runBtn").trigger("click"); }, 200);
+    </script>
+</body>
+</html>

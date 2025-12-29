@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test gh-4350 (focus cycle)</title>
+    <script>
+    // Capture console.log output
+    var consoleOutput = [];
+    var originalLog = console.log;
+    console.log = function() {
+        var msg = Array.prototype.slice.call(arguments).join(' ');
+        consoleOutput.push(msg);
+        originalLog.apply(console, arguments);
+    };
+    </script>
+    <script src="../dist/jquery.js"></script>
+    <style>
+        pre { background: #f0f0f0; padding: 10px; font-size: 11px; max-height: 70vh; overflow: auto; }
+        .highlight { background: yellow; }
+        .error { background: #fcc; }
+        #console { background: #333; color: #0f0; font-size: 10px; }
+    </style>
+</head>
+<body>
+    <h2>gh-4350 Test (focus cycle)</h2>
+    <input type="text" id="name" value="test" />
+    <button id="runBtn">Run Test</button>
+    <div id="output"></div>
+    <h3>Console Output:</h3>
+    <pre id="console"></pre>
+    
+    <script>
+    var log = [];
+    var $output = jQuery("#output");
+    var $console = jQuery("#console");
+    
+    function updateConsole() {
+        $console.text(consoleOutput.join("\n"));
+    }
+    
+    function addLog(msg, isError) {
+        log.push({ msg: msg, error: isError });
+        var html = log.map(function(item) {
+            var cls = item.error ? 'error' : (item.msg.indexOf("FOCUS HANDLER") > -1 ? 'highlight' : '');
+            return cls ? '<span class="' + cls + '">' + item.msg + '</span>' : item.msg;
+        }).join("\n");
+        $output.html("<pre>" + html + "</pre>");
+        updateConsole();
+    }
+    
+    jQuery("#runBtn").on("click", function() {
+        log = [];
+        consoleOutput = [];
+        
+        var remaining = 3;
+        var input = jQuery("#name");
+        var focusCallCount = 0;
+        
+        // Remove any existing handlers
+        input.off("focus blur");
+        
+        addLog("Setting up handlers...");
+        
+        input
+            .on("focus", function() {
+                focusCallCount++;
+                remaining--;
+                addLog(">>> FOCUS HANDLER CALLED #" + focusCallCount + " (remaining=" + remaining + ") <<<");
+                
+                if (remaining > 0) {
+                    addLog("  Triggering blur...");
+                    input.trigger("blur");
+                    addLog("  blur trigger returned");
+                } else if (remaining === 0) {
+                    addLog("  DONE - remaining is 0");
+                } else {
+                    addLog("  ERROR - remaining went negative!", true);
+                }
+            })
+            .on("blur", function() {
+                addLog("  Blur handler called, scheduling focus via setTimeout");
+                setTimeout(function() {
+                    addLog("  setTimeout fired, triggering focus...");
+                    input.trigger("focus");
+                    addLog("  focus trigger returned");
+                }, 10);
+            });
+        
+        addLog("Calling initial trigger('focus')...");
+        input.trigger("focus");
+        addLog("Initial trigger('focus') returned");
+        
+        // Wait for all async operations
+        setTimeout(function() {
+            addLog("\n=== FINAL RESULT ===");
+            addLog("Focus handler was called " + focusCallCount + " times");
+            addLog("Expected: 3, Actual: " + focusCallCount);
+            if (focusCallCount === 3) {
+                addLog("TEST PASSED ✓");
+            } else {
+                addLog("TEST FAILED ✗", true);
+            }
+            updateConsole();
+        }, 500);
+    });
+    
+    // Auto-run
+    setTimeout(function() {
+        jQuery("#runBtn").trigger("click");
+    }, 100);
+    </script>
+</body>
+</html>

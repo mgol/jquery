@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test gh-5459</title>
+    <script src="../dist/jquery.js"></script>
+    <style>
+        pre { background: #f0f0f0; padding: 10px; font-size: 12px; max-height: 80vh; overflow: auto; }
+        .highlight { background: yellow; }
+        .fail { background: #ffcccc; }
+    </style>
+</head>
+<body>
+    <h2>gh-5459 Test</h2>
+    <button id="runBtn">Run Test</button>
+    <div id="qunit-fixture"></div>
+    <div id="output"></div>
+    
+    <script>
+    var log = [];
+    var $output = jQuery("#output");
+    var depth = 0;
+    
+    function addLog(msg) {
+        var indent = new Array(depth * 2 + 1).join(" ");
+        log.push(indent + msg);
+        var html = log.map(function(line) {
+            if (line.indexOf("FOCUS HANDLER CALLED") > -1) {
+                return '<span class="highlight">' + line + '</span>';
+            }
+            if (line.indexOf("FAIL") > -1) {
+                return '<span class="fail">' + line + '</span>';
+            }
+            return line;
+        }).join("\n");
+        $output.html("<pre>" + html + "</pre>");
+        console.log(indent + msg);
+    }
+    
+    function patchAddEventListener(elem) {
+        var nativeAddEvent = elem[0].addEventListener;
+        
+        elem[0].addEventListener = function(eventName, handler) {
+            var finalHandler;
+            if (eventName === "blur") {
+                addLog("[patch] Wrapping blur handler to call twice");
+                finalHandler = function wrappedHandler() {
+                    addLog("[native-blur] Call #1 to blur handler");
+                    depth++;
+                    handler.apply(this, arguments);
+                    depth--;
+                    addLog("[native-blur] Call #2 to blur handler");
+                    depth++;
+                    var result = handler.apply(this, arguments);
+                    depth--;
+                    return result;
+                };
+            } else {
+                addLog("[patch] Adding " + eventName + " handler (not wrapped)");
+                finalHandler = handler;
+            }
+            return nativeAddEvent.call(this, eventName, finalHandler);
+        };
+    }
+    
+    function runTest(handler, message) {
+        addLog("\n=== TEST: " + message + " ===");
+        
+        var $button = jQuery("<button>Test</button>");
+        
+        // EXACTLY like the QUnit test:
+        patchAddEventListener($button);
+        $button.appendTo("#qunit-fixture");
+        
+        var focusCallCount = 0;
+        
+        if (handler) {
+            addLog("Adding blur handler");
+            $button.on("blur", handler);
+        }
+        
+        addLog("Adding focus handler");
+        $button.on("focus", function onFocusHandler() {
+            focusCallCount++;
+            addLog(">>> FOCUS HANDLER CALLED #" + focusCallCount + " <<<");
+            addLog("Calling $button.trigger('blur')...");
+            depth++;
+            $button.trigger("blur");
+            depth--;
+            addLog("trigger('blur') returned");
+        });
+        
+        addLog("Calling $button.trigger('focus')...");
+        depth++;
+        $button.trigger("focus");
+        depth--;
+        addLog("trigger('focus') returned");
+        addLog("Focus handler called " + focusCallCount + " time(s) - " + 
+               (focusCallCount === 1 ? "PASS" : "FAIL (expected 1)"));
+    }
+    
+    jQuery("#runBtn").on("click", function() {
+        log = [];
+        depth = 0;
+        addLog("Running all 4 tests...");
+        
+        runTest(undefined, "no prior handler");
+        runTest(function() { return true; }, "prior handler returning true");
+        runTest(function() { return { length: 42 }; }, "prior handler returning an array-like");
+        runTest(function() { return { value: 42 }; }, "prior handler returning { value }");
+        
+        addLog("\n=== DONE ===");
+    });
+    
+    // Auto-run
+    setTimeout(function() {
+        jQuery("#runBtn").trigger("click");
+    }, 100);
+    </script>
+</body>
+</html>
