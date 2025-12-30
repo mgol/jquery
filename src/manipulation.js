@@ -9,7 +9,6 @@ import { domManip } from "./manipulation/domManip.js";
 import { setGlobalEval } from "./manipulation/setGlobalEval.js";
 import { dataPriv } from "./data/var/dataPriv.js";
 import { dataUser } from "./data/var/dataUser.js";
-import { acceptData } from "./data/var/acceptData.js";
 import { nodeName } from "./core/nodeName.js";
 
 import "./core/init.js";
@@ -29,8 +28,19 @@ function manipulationTarget( elem, content ) {
 	return elem;
 }
 
+/**
+ * Copy events from one element to another during cloning.
+ *
+ * UPDATED for 1:1 native binding architecture:
+ * - Iterates through all handlers in the events object
+ * - Re-attaches each handler with its original options (passive, capture, once)
+ * - Each handler gets a new wrapper function via jQuery.event.add
+ *
+ * @param {Element} src - Source element to copy events from
+ * @param {Element} dest - Destination element to copy events to
+ */
 function cloneCopyEvent( src, dest ) {
-	var type, i, l,
+	var type, i, l, handleObj,
 		events = dataPriv.get( src, "events" );
 
 	if ( dest.nodeType !== 1 ) {
@@ -39,10 +49,28 @@ function cloneCopyEvent( src, dest ) {
 
 	// 1. Copy private data: events, handlers, etc.
 	if ( events ) {
-		dataPriv.remove( dest, "handle events" );
+
+		// Clear any existing events on destination (shouldn't be any, but safety first)
+		dataPriv.remove( dest, "events" );
+
+		// Iterate through all event types
 		for ( type in events ) {
+
+			// Iterate through all handlers for this event type
 			for ( i = 0, l = events[ type ].length; i < l; i++ ) {
-				jQuery.event.add( dest, type, events[ type ][ i ] );
+				handleObj = events[ type ][ i ];
+
+				// Re-add the event handler to the destination element
+				// This will create a new wrapper function and attach a new native listener
+				// The options (passive, capture, once) are preserved in handleObj.options
+				jQuery.event.add(
+					dest,
+					handleObj.origType,
+					handleObj.handler,
+					handleObj.data,
+					handleObj.selector,
+					handleObj.options
+				);
 			}
 		}
 	}
@@ -108,36 +136,61 @@ jQuery.extend( {
 		return clone;
 	},
 
+	/**
+	 * Clean up jQuery data and events for elements being removed from the DOM.
+	 *
+	 * UPDATED for 1:1 native binding architecture:
+	 * - Each handler has its own native listener stored in handleObj.wrapperFn
+	 * - We must remove each listener individually via removeEventListener
+	 * - No more shared "handle" function to worry about
+	 *
+	 * @param {Array} elems - Array of elements to clean
+	 */
 	cleanData: function( elems ) {
-		var data, elem, type,
-			special = jQuery.event.special,
+		var data, elem, type, handleObj, handlers, j, len,
 			i = 0;
 
 		for ( ; ( elem = elems[ i ] ) !== undefined; i++ ) {
-			if ( acceptData( elem ) ) {
-				if ( ( data = elem[ dataPriv.expando ] ) ) {
-					if ( data.events ) {
-						for ( type in data.events ) {
-							if ( special[ type ] ) {
-								jQuery.event.remove( elem, type );
 
-							// This is a shortcut to avoid jQuery.event.remove's overhead
-							} else {
-								jQuery.removeEvent( elem, type, data.handle );
-							}
-						}
+			// Only clean elements that accept data
+			if ( !elem[ dataPriv.expando ] ) {
+				continue;
+			}
+
+			data = elem[ dataPriv.expando ];
+
+			if ( data && data.events ) {
+
+				// Remove each event handler individually
+				// With 1:1 native binding, each handler has its own native listener
+				for ( type in data.events ) {
+					handlers = data.events[ type ];
+
+					// Iterate through all handlers for this type
+					for ( j = 0, len = handlers.length; j < len; j++ ) {
+						handleObj = handlers[ j ];
+
+						// Remove the native event listener
+						// Use the stored wrapper function and capture flag
+						elem.removeEventListener(
+							type,
+							handleObj.wrapperFn,
+							{ capture: handleObj.options && handleObj.options.capture }
+						);
 					}
-
-					// Support: Chrome <=35 - 45+
-					// Assign undefined instead of using delete, see Data#remove
-					elem[ dataPriv.expando ] = undefined;
 				}
-				if ( elem[ dataUser.expando ] ) {
 
-					// Support: Chrome <=35 - 45+
-					// Assign undefined instead of using delete, see Data#remove
-					elem[ dataUser.expando ] = undefined;
-				}
+				// Support: Chrome <=35 - 45+
+				// Assign undefined instead of using delete, see Data#remove
+				elem[ dataPriv.expando ] = undefined;
+			}
+
+			// Clean user data
+			if ( elem[ dataUser.expando ] ) {
+
+				// Support: Chrome <=35 - 45+
+				// Assign undefined instead of using delete, see Data#remove
+				elem[ dataUser.expando ] = undefined;
 			}
 		}
 	}
