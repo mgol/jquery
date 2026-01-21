@@ -139,10 +139,20 @@ this.createXMLFragment = function() {
 };
 
 window.fireNative = function( node, type ) {
-	var event = document.createEvent( "HTMLEvents" );
-
-	event.initEvent( type, true, true );
-	node.dispatchEvent( event );
+	let EventClass = Event;
+	if ( type === "click" || type.indexOf( "pointer" ) === 0 ) {
+		EventClass = PointerEvent;
+	} else if ( type.indexOf( "mouse" ) === 0 ) {
+		EventClass = MouseEvent;
+	} else if ( type.indexOf( "focus" ) === 0 || type.indexOf( "blur" ) === 0 ) {
+		EventClass = FocusEvent;
+	} else if ( type.indexOf( "drag" ) === 0 || type.indexOf( "drop" ) === 0 ) {
+		EventClass = DragEvent;
+	}
+	node.dispatchEvent( new EventClass( type, {
+		bubbles: true,
+		cancelable: true
+	} ) );
 };
 
 /**
