@@ -407,9 +407,7 @@ QUnit.test( "on bubbling, isDefaultPrevented, stopImmediatePropagation", functio
 		fakeClick = function( $jq ) {
 
 			// Use a native click so we don't get jQuery simulated bubbling
-			var e = document.createEvent( "MouseEvents" );
-			e.initEvent( "click", true, true );
-			$jq[ 0 ].dispatchEvent( e );
+			fireNative( $jq[ 0 ], "click" );
 		};
 	$anchor2.on( "click", function( e ) {
 		e.preventDefault();
@@ -1294,7 +1292,7 @@ QUnit.test( ".trigger() doesn't bubble load event (trac-10717)", function( asser
 QUnit.test( "Delegated events in SVG (trac-10791; trac-13180)", function( assert ) {
 	assert.expect( 2 );
 
-	var useElem, e,
+	var useElem,
 		svg = jQuery(
 			"<svg height='1' version='1.1' width='1' xmlns='http://www.w3.org/2000/svg'>" +
 			"<defs><rect id='ref' x='10' y='20' width='100' height='60' r='10' rx='10' ry='10'></rect></defs>" +
@@ -1319,10 +1317,8 @@ QUnit.test( "Delegated events in SVG (trac-10791; trac-13180)", function( assert
 	// Fire a native click on an SVGElementInstance (the instance tree of an SVG <use>)
 	// to confirm that it doesn't break our event delegation handling (trac-13180)
 	useElem = svg.find( "#use" )[ 0 ];
-	if ( document.createEvent && useElem && useElem.instanceRoot ) {
-		e = document.createEvent( "MouseEvents" );
-		e.initEvent( "click", true, true );
-		useElem.instanceRoot.dispatchEvent( e );
+	if ( useElem && useElem.instanceRoot ) {
+		fireNative( useElem.instanceRoot, "click" );
 	}
 
 	jQuery( "#qunit-fixture" ).off( "click" );
@@ -2606,8 +2602,7 @@ QUnit.test( "event object properties on natively-triggered event", function( ass
 	assert.expect( 3 );
 
 	var link = document.createElement( "a" ),
-		$link = jQuery( link ),
-		evt = document.createEvent( "MouseEvents" );
+		$link = jQuery( link );
 
 	// IE requires element to be in the body before it will dispatch
 	$link.appendTo( "body" ).on( "click", function( e ) {
@@ -2617,8 +2612,7 @@ QUnit.test( "event object properties on natively-triggered event", function( ass
 		assert.equal( "cancelable" in e, true, "has .cancelable" );
 		assert.equal( "bubbles" in e, true, "has .bubbles" );
 	} );
-	evt.initEvent( "click", true, true );
-	link.dispatchEvent( evt );
+	fireNative( link, "click" );
 	$link.off( "click" ).remove();
 } );
 
@@ -2693,7 +2687,7 @@ testIframe(
 
 		// Create a focusin handler on the parent; shouldn't affect the iframe's fate
 		jQuery( "body" ).on( "focusin.iframeTest", function() {
-			assert.ok( false, "fired a focusin event in the parent document" );
+				assert.ok( false, "fired a focusin event in the parent document" );
 		} );
 
 		input.on( "focusin", function() {
@@ -3377,7 +3371,7 @@ QUnit.test( "focus change during a focus handler (gh-4382)", function( assert ) 
 	} );
 
 	jQuery( document ).on( "focusin.focusTests", function() {
-		assert.ok( true, "focusin propagated to document from the button" );
+			assert.ok( true, "focusin propagated to document from the button" );
 	} );
 
 	select.trigger( "focus" );
