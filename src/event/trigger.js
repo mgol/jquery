@@ -3,35 +3,118 @@ import { document } from "../var/document.js";
 import { dataPriv } from "../data/var/dataPriv.js";
 import { acceptData } from "../data/var/acceptData.js";
 import { hasOwn } from "../var/hasOwn.js";
-import { isWindow } from "../var/isWindow.js";
 
 import "../event.js";
 
-var rfocusMorph = /^(?:focusinfocus|focusoutblur)$/,
-	stopPropagationCallback = function( e ) {
-		e.stopPropagation();
+var triggerMetadataKey = "triggerMetadata",
+	focusTriggerGuardKey = "focusTriggerGuard";
+
+function isFocusEventType( type ) {
+	return type === "focus" || type === "blur" || type === "focusin" || type === "focusout";
+}
+
+function makeNamespaceRegExp( namespaces ) {
+	return namespaces.length ?
+		new RegExp( "(^|\\.)" + namespaces.join( "\\.(?:.*\\.|)" ) + "(\\.|$)" ) :
+		null;
+}
+
+function createNativeEvent( type ) {
+	var globalObject = typeof window !== "undefined" ? window : ( document.defaultView || {} ),
+		PointerCtor = globalObject.PointerEvent,
+		FocusCtor = globalObject.FocusEvent,
+		CustomCtor = globalObject.CustomEvent,
+		focusEvent,
+		bubbles = type !== "focus" && type !== "blur";
+
+	if ( type === "click" && PointerCtor ) {
+		return new PointerCtor( "click", {
+			bubbles: true,
+			cancelable: true
+		} );
+	}
+
+	if ( isFocusEventType( type ) && FocusCtor ) {
+		focusEvent = new FocusCtor( type, {
+			bubbles: bubbles,
+			cancelable: true
+		} );
+		return focusEvent;
+	}
+
+	return new CustomCtor( type, {
+		bubbles: bubbles,
+		cancelable: true
+	} );
+}
+
+function applyTriggerMetadata( nativeEvent, metadata ) {
+	dataPriv.set( nativeEvent, triggerMetadataKey, metadata );
+}
+
+function clearTriggerMetadata( nativeEvent ) {
+	dataPriv.remove( nativeEvent, triggerMetadataKey );
+}
+
+function dispatchNative(
+	elem,
+	nativeEvent,
+	data,
+	namespaceString,
+	rnamespace,
+	isTrigger,
+	manual,
+	triggerProps
+) {
+	var metadata = {
+		data: data,
+		namespaceString: namespaceString,
+		rnamespace: rnamespace,
+		isTrigger: isTrigger,
+		manual: manual,
+		triggerProps: triggerProps,
+		result: undefined
 	};
+
+	applyTriggerMetadata(
+		nativeEvent,
+		metadata
+	);
+	try {
+		elem.dispatchEvent( nativeEvent );
+	} finally {
+		clearTriggerMetadata( nativeEvent );
+	}
+
+	return metadata.result;
+}
 
 jQuery.extend( jQuery.event, {
 
 	trigger: function( event, data, elem, onlyHandlers ) {
 
-		var i, cur, tmp, bubbleType, ontype, handle, special, lastElement,
-			eventPath = [ elem || document ],
+		var namespaceString, namespaces,
+			rnamespace, special, delegateType,
+			explicitEventObject,
+			eventProp,
+			ontype, handle,
+			nativeEvent, companionEvent,
+			result, companionResult,
+			submitTarget,
+			guardDepth,
 			type = hasOwn.call( event, "type" ) ? event.type : event,
-			namespaces = hasOwn.call( event, "namespace" ) ? event.namespace.split( "." ) : [];
+			triggerData = data == null ? [] : jQuery.makeArray( data );
 
-		cur = lastElement = tmp = elem = elem || document;
+		elem = elem || document;
 
 		// Don't do events on text and comment nodes
 		if ( elem.nodeType === 3 || elem.nodeType === 8 ) {
 			return;
 		}
 
-		// focus/blur morphs to focusin/out; ensure we're not firing them right now
-		if ( rfocusMorph.test( type + jQuery.event.triggered ) ) {
-			return;
-		}
+		namespaces = hasOwn.call( event, "namespace" ) ?
+			event.namespace.split( "." ) :
+			[];
 
 		if ( type.indexOf( "." ) > -1 ) {
 
@@ -40,123 +123,207 @@ jQuery.extend( jQuery.event, {
 			type = namespaces.shift();
 			namespaces.sort();
 		}
+
+		namespaceString = namespaces.join( "." );
+		rnamespace = makeNamespaceRegExp( namespaces );
+		explicitEventObject = hasOwn.call( event, "type" );
 		ontype = type.indexOf( ":" ) < 0 && "on" + type;
 
-		// Caller can pass in a jQuery.Event object, Object, or just an event type string
-		event = event[ jQuery.expando ] ?
-			event :
-			new jQuery.Event( type, typeof event === "object" && event );
+		special = jQuery.event.special[ type ] || {};
 
-		// Trigger bitmask: & 1 for native handlers; & 2 for jQuery (always true)
-		event.isTrigger = onlyHandlers ? 2 : 3;
-		event.namespace = namespaces.join( "." );
-		event.rnamespace = event.namespace ?
-			new RegExp( "(^|\\.)" + namespaces.join( "\\.(?:.*\\.|)" ) + "(\\.|$)" ) :
-			null;
+		if ( onlyHandlers ) {
+			if ( explicitEventObject ) {
+				nativeEvent = event[ jQuery.expando ] ? event : new jQuery.Event( type, event );
+				nativeEvent.type = type;
+				nativeEvent.isTrigger = 2;
+				nativeEvent.namespace = namespaceString;
+				nativeEvent.rnamespace = rnamespace;
+				nativeEvent.result = undefined;
+				if ( !nativeEvent.target ) {
+					nativeEvent.target = elem;
+				}
 
-		// Clean up the event in case it is being reused
-		event.result = undefined;
-		if ( !event.target ) {
-			event.target = elem;
+				nativeEvent.result = jQuery.event.dispatch.apply(
+					elem,
+					[ nativeEvent ].concat( triggerData )
+				);
+				return nativeEvent.result;
+			}
+
+			nativeEvent = new jQuery.Event( type );
+			nativeEvent.isTrigger = 2;
+			nativeEvent.namespace = namespaceString;
+			nativeEvent.rnamespace = rnamespace;
+			nativeEvent.target = elem;
+			nativeEvent.result = jQuery.event.dispatch.apply(
+				elem,
+				[ nativeEvent ].concat( triggerData )
+			);
+
+			handle = ontype && elem[ ontype ];
+			if ( handle && handle.apply && acceptData( elem ) ) {
+				handle = handle.apply( elem, [ nativeEvent ].concat( triggerData ) );
+				if ( handle !== undefined ) {
+					nativeEvent.result = handle;
+					if ( handle === false ) {
+						nativeEvent.preventDefault();
+					}
+				}
+			}
+
+			return nativeEvent.result;
 		}
 
-		// Clone any incoming data and prepend the event, creating the handler arg list
-		data = data == null ?
-			[ event ] :
-			jQuery.makeArray( data, [ event ] );
-
-		// Allow special events to draw outside the lines
-		special = jQuery.event.special[ type ] || {};
-		if ( !onlyHandlers && special.trigger && special.trigger.apply( elem, data ) === false ) {
+		if ( !elem.dispatchEvent ) {
 			return;
 		}
 
-		// Determine event propagation path in advance, per W3C events spec (trac-9951)
-		// Bubble up to document, then to window; watch for a global ownerDocument var (trac-9724)
-		if ( !onlyHandlers && !special.noBubble && !isWindow( elem ) ) {
-
-			bubbleType = special.delegateType || type;
-			if ( !rfocusMorph.test( bubbleType + type ) ) {
-				cur = cur.parentNode;
-			}
-			for ( ; cur; cur = cur.parentNode ) {
-				eventPath.push( cur );
-				tmp = cur;
+		if ( explicitEventObject ) {
+			if (
+				event[ jQuery.expando ] &&
+				event.isPropagationStopped &&
+				event.isPropagationStopped()
+			) {
+				return event.result;
 			}
 
-			// Only add window if we got to document (e.g., not plain obj or detached DOM)
-			if ( tmp === ( elem.ownerDocument || document ) ) {
-				eventPath.push( tmp.defaultView || tmp.parentWindow || window );
-			}
-		}
+			nativeEvent = event[ jQuery.expando ] ?
+				null :
+				( event.originalEvent || ( event.target ? event : null ) );
 
-		// Fire handlers on the event path
-		i = 0;
-		while ( ( cur = eventPath[ i++ ] ) && !event.isPropagationStopped() ) {
-			lastElement = cur;
-			event.type = i > 1 ?
-				bubbleType :
-				special.bindType || type;
+			if ( !nativeEvent || nativeEvent[ jQuery.expando ] ) {
+				nativeEvent = createNativeEvent( type );
 
-			// jQuery handler
-			handle = ( dataPriv.get( cur, "events" ) || Object.create( null ) )[ event.type ] &&
-				dataPriv.get( cur, "handle" );
-			if ( handle ) {
-				handle.apply( cur, data );
-			}
+				for ( eventProp in event ) {
+					if ( eventProp === "type" || eventProp === jQuery.expando ) {
+						continue;
+					}
 
-			// Native handler
-			handle = ontype && cur[ ontype ];
-			if ( handle && handle.apply && acceptData( cur ) ) {
-				event.result = handle.apply( cur, data );
-				if ( event.result === false ) {
-					event.preventDefault();
+					try {
+						nativeEvent[ eventProp ] = event[ eventProp ];
+					} catch ( ignored ) {
+					}
 				}
 			}
+
+			result = dispatchNative(
+				elem,
+				nativeEvent,
+				triggerData,
+				namespaceString,
+				rnamespace,
+				3,
+				true,
+				event
+			);
+
+			if ( event && typeof event === "object" ) {
+				event.result = result;
+			}
+
+			return result;
 		}
-		event.type = type;
 
-		// If nobody prevented the default action, do it now
-		if ( !onlyHandlers && !event.isDefaultPrevented() ) {
+		delegateType = special.delegateType;
 
-			if ( ( !special._default ||
-				special._default.apply( eventPath.pop(), data ) === false ) &&
-				acceptData( elem ) ) {
-
-				// Call a native DOM method on the target with the same name as the event.
-				// Don't do default actions on window, that's where global variables be (trac-6170)
-				if ( ontype && typeof elem[ type ] === "function" && !isWindow( elem ) ) {
-
-					// Don't re-trigger an onFOO event when we call its FOO() method
-					tmp = elem[ ontype ];
-
-					if ( tmp ) {
-						elem[ ontype ] = null;
-					}
-
-					// Prevent re-triggering of the same event, since we already bubbled it above
-					jQuery.event.triggered = type;
-
-					if ( event.isPropagationStopped() ) {
-						lastElement.addEventListener( type, stopPropagationCallback );
-					}
-
+		if ( type === "focus" || type === "blur" ) {
+			if ( typeof elem[ type ] === "function" ) {
+				if ( triggerData.length ) {
+					jQuery.event.focusTriggerGuard = ( jQuery.event.focusTriggerGuard || 0 ) + 1;
+					guardDepth = dataPriv.get( elem, focusTriggerGuardKey ) || 0;
+					dataPriv.set( elem, focusTriggerGuardKey, guardDepth + 1 );
+				}
+				try {
 					elem[ type ]();
-
-					if ( event.isPropagationStopped() ) {
-						lastElement.removeEventListener( type, stopPropagationCallback );
-					}
-
-					jQuery.event.triggered = undefined;
-
-					if ( tmp ) {
-						elem[ ontype ] = tmp;
+				} finally {
+					if ( triggerData.length ) {
+						jQuery.event.focusTriggerGuard = Math.max(
+							( jQuery.event.focusTriggerGuard || 1 ) - 1,
+							0
+						);
+						guardDepth = ( dataPriv.get( elem, focusTriggerGuardKey ) || 1 ) - 1;
+						if ( guardDepth > 0 ) {
+							dataPriv.set( elem, focusTriggerGuardKey, guardDepth );
+						} else {
+							dataPriv.remove( elem, focusTriggerGuardKey );
+						}
 					}
 				}
 			}
+
+			if ( !triggerData.length ) {
+				return;
+			}
+
+			nativeEvent = new jQuery.Event( type );
+			nativeEvent.isTrigger = 3;
+			nativeEvent.namespace = namespaceString;
+			nativeEvent.rnamespace = rnamespace;
+			nativeEvent.target = elem;
+			result = jQuery.event.dispatch.apply(
+				elem,
+				[ nativeEvent ].concat( triggerData )
+			);
+
+			companionEvent = createNativeEvent( type === "focus" ? "focusin" : "focusout" );
+			companionResult = dispatchNative(
+				elem,
+				companionEvent,
+				triggerData,
+				namespaceString,
+				rnamespace,
+				3,
+				true
+			);
+
+			return companionResult !== undefined ?
+				companionResult :
+				result;
 		}
 
-		return event.result;
+		nativeEvent = createNativeEvent( type );
+
+		if ( type === "click" && elem.nodeName && elem.nodeName.toLowerCase() === "a" ) {
+			nativeEvent.preventDefault();
+		}
+
+		result = dispatchNative(
+			elem,
+			nativeEvent,
+			triggerData,
+			namespaceString,
+			rnamespace,
+			3,
+			true
+		);
+
+		if ( type === "submit" && !nativeEvent.defaultPrevented ) {
+			submitTarget = elem;
+
+			if ( submitTarget.nodeName && submitTarget.nodeName.toLowerCase() !== "form" ) {
+				submitTarget = submitTarget.form;
+			}
+
+			if ( submitTarget && typeof submitTarget.submit === "function" ) {
+				submitTarget.submit();
+			}
+		}
+
+		if ( delegateType && delegateType !== type && !isFocusEventType( type ) ) {
+			companionEvent = createNativeEvent( delegateType );
+			companionResult = dispatchNative(
+				elem,
+				companionEvent,
+				triggerData,
+				namespaceString,
+				rnamespace,
+				3,
+				true
+			);
+			return companionResult !== undefined ? companionResult : result;
+		}
+
+		return result;
 	},
 
 	// Piggyback on a donor event to simulate a different one

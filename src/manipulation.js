@@ -39,7 +39,7 @@ function cloneCopyEvent( src, dest ) {
 
 	// 1. Copy private data: events, handlers, etc.
 	if ( events ) {
-		dataPriv.remove( dest, "handle events" );
+		dataPriv.remove( dest, "events" );
 		for ( type in events ) {
 			for ( i = 0, l = events[ type ].length; i < l; i++ ) {
 				jQuery.event.add( dest, type, events[ type ][ i ] );
@@ -109,8 +109,8 @@ jQuery.extend( {
 	},
 
 	cleanData: function( elems ) {
-		var data, elem, type,
-			special = jQuery.event.special,
+		var data, elem, type, handlerIndex,
+			handlers,
 			i = 0;
 
 		for ( ; ( elem = elems[ i ] ) !== undefined; i++ ) {
@@ -118,12 +118,18 @@ jQuery.extend( {
 				if ( ( data = elem[ dataPriv.expando ] ) ) {
 					if ( data.events ) {
 						for ( type in data.events ) {
-							if ( special[ type ] ) {
-								jQuery.event.remove( elem, type );
-
-							// This is a shortcut to avoid jQuery.event.remove's overhead
-							} else {
-								jQuery.removeEvent( elem, type, data.handle );
+							handlers = data.events[ type ].slice();
+							for (
+								handlerIndex = handlers.length - 1;
+								handlerIndex >= 0;
+								handlerIndex--
+							) {
+								jQuery.event.remove(
+									elem,
+									handlers[ handlerIndex ].origType,
+									handlers[ handlerIndex ].handler,
+									handlers[ handlerIndex ].selector
+								);
 							}
 						}
 					}
