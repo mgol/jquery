@@ -1,6 +1,5 @@
 import { jQuery } from "./core.js";
 import { access } from "./core/access.js";
-import { camelCase } from "./core/camelCase.js";
 import { dataPriv } from "./data/var/dataPriv.js";
 import { dataUser } from "./data/var/dataUser.js";
 
@@ -14,8 +13,7 @@ import { dataUser } from "./data/var/dataUser.js";
 //	5. Avoid exposing implementation details on user objects (eg. expando properties)
 //	6. Provide a clear path for implementation upgrade to WeakMap in 2014
 
-var rbrace = /^(?:\{[\w\W]*\}|\[[\w\W]*\])$/,
-	rmultiDash = /[A-Z]/g;
+var rbrace = /^(?:\{[\w\W]*\}|\[[\w\W]*\])$/;
 
 function getData( data ) {
 	if ( data === "true" ) {
@@ -43,13 +41,11 @@ function getData( data ) {
 }
 
 function dataAttr( elem, key, data ) {
-	var name;
 
 	// If nothing was found internally, try to fetch any
 	// data from the HTML5 data-* attribute
 	if ( data === undefined && elem.nodeType === 1 ) {
-		name = "data-" + key.replace( rmultiDash, "-$&" ).toLowerCase();
-		data = elem.getAttribute( name );
+		data = elem.dataset[ key ];
 
 		if ( typeof data === "string" ) {
 			try {
@@ -91,9 +87,9 @@ jQuery.extend( {
 
 jQuery.fn.extend( {
 	data: function( key, value ) {
-		var i, name, data,
+		var name, data,
 			elem = this[ 0 ],
-			attrs = elem && elem.attributes;
+			dataset = elem && elem.dataset;
 
 		// Gets all values
 		if ( key === undefined ) {
@@ -101,13 +97,8 @@ jQuery.fn.extend( {
 				data = dataUser.get( elem );
 
 				if ( elem.nodeType === 1 && !dataPriv.get( elem, "hasDataAttrs" ) ) {
-					i = attrs.length;
-					while ( i-- ) {
-						name = attrs[ i ].name;
-						if ( name.indexOf( "data-" ) === 0 ) {
-							name = camelCase( name.slice( 5 ) );
-							dataAttr( elem, name, data[ name ] );
-						}
+					for ( name in dataset ) {
+						dataAttr( elem, name, data[ name ] );
 					}
 					dataPriv.set( elem, "hasDataAttrs", true );
 				}
