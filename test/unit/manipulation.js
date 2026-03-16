@@ -1635,6 +1635,36 @@ QUnit.test( "clone() on local XML nodes with html5 nodename", function( assert )
 	assert.equal( $meter[ 0 ].nodeType, 1, "Check if nodeType is not changed due to cloning" );
 } );
 
+QUnit.test( "clone() finds MathML by tag name (gh-3642)", function( assert ) {
+
+	assert.expect( 4 );
+
+	var div = jQuery(
+			"<div>" +
+			"	<math xmlns='http://www.w3.org/1998/Math/MathML'>" +
+			"		<mn>1</mn>" +
+			"		<mo>+</mo>" +
+			"		<mn>2</mn>" +
+			"		<mo>=</mo>" +
+			"		<mn>3</mn>" +
+			"	</math>" +
+			"	<math>" +
+			"		<mn>4</mn>" +
+			"		<mo>+</mo>" +
+			"		<mn>5</mn>" +
+			"		<mo>=</mo>" +
+			"		<mn>9</mn>" +
+			"	</math>" +
+			"</div>"
+		),
+		clone = div.clone();
+
+	assert.equal( div.find( "math" ).length, 2, "find('math') on original element" );
+	assert.equal( div.find( "mo" ).length, 4, "find('mo') on original element" );
+	assert.equal( clone.find( "math" ).length, 2, "find('math') on cloned element" );
+	assert.equal( clone.find( "mo" ).length, 4, "find('mo') on cloned element" );
+} );
+
 QUnit.test( "html(undefined)", function( assert ) {
 
 	assert.expect( 1 );

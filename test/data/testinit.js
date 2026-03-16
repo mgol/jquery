@@ -116,6 +116,7 @@ this.createWithFriesXML = function() {
 									<thing att='something' /> \
 								</property> \
 								<foo_bar>foo</foo_bar> \
+								<qwerty>qqq</qwerty> \
 							</properties> \
 						</component> \
 					</meta> \
