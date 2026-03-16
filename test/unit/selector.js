@@ -146,6 +146,47 @@ QUnit.test( "element", function( assert ) {
 	assert.t( "Element name matches Object.prototype property", "toString#toString", [ "toString" ] );
 } );
 
+QUnit.test( "element - custom tag names (gh-3642)", function( assert ) {
+
+	assert.expect( QUnit.jQuerySelectors ? 8 : 4 );
+
+	var container,
+		tagData = [
+			{ name: "span", selector: "span" },
+			{ name: "my-component", selector: "my-component" },
+			{ name: "my-component.v2", selector: "my-component\\.v2" },
+			{
+				name: "a-\u00B7._.\u00B7-b\u0300\u0371\u2070\u2100" +
+					"\u2C00\u2F00\u3401\uF900\uFDF0\uD800\uDC00",
+
+				// Only the two dots need CSS escaping; all other characters
+				// are alphanumeric, `-`, `_`, or non-ASCII (>= U+0080).
+				selector: "a-\u00B7\\._\\.\u00B7-b\u0300\u0371\u2070\u2100" +
+					"\u2C00\u2F00\u3401\uF900\uFDF0\uD800\uDC00"
+			}
+		];
+
+	jQuery.each( tagData, function( _, tag ) {
+		container = jQuery(
+			"<div><" + tag.name + ">hello</" + tag.name + "></div>"
+		).appendTo( "#qunit-fixture" );
+
+		assert.strictEqual(
+			container.find( tag.selector ).length,
+			1,
+			"Tag name \"" + tag.name + "\": simple selector"
+		);
+
+		if ( QUnit.jQuerySelectors ) {
+			assert.strictEqual(
+				container.find( tag.selector + ":contains('')" ).length,
+				1,
+				"Tag name \"" + tag.name + "\": selector with a jQuery pseudo"
+			);
+		}
+	} );
+} );
+
 QUnit.test( "XML Document Selectors", function( assert ) {
 	assert.expect( 11 );
 
@@ -1613,7 +1654,7 @@ QUnit.test( "pseudo - :lang", function( assert ) {
 } );
 
 QUnit.test( "context", function( assert ) {
-	assert.expect( 21 );
+	assert.expect( 22 );
 
 	var context,
 		selector = ".blog",
@@ -1695,6 +1736,16 @@ QUnit.test( "context", function( assert ) {
 	} else {
 		assert.ok( "skip", ":has not supported in selector-native" );
 	}
+
+	context = document.createDocumentFragment();
+	context.appendChild( document.createElement( "em" ) );
+	context.appendChild( document.createElement( "span" ) );
+
+	assert.deepEqual(
+		jQuery( "~ span", context.firstChild ).get(),
+		[ context.lastChild ],
+		"DocumentFragment context: leading sibling combinator expands context to fragment"
+	);
 } );
 
 // Support: IE 11+

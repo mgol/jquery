@@ -62,7 +62,7 @@ var i,
 	rheader = /^h\d$/i,
 
 	// Easily-parseable/retrievable ID or TAG or CLASS selectors
-	rquickExpr = /^(?:#([\w-]+)|(\w+)|\.([\w-]+))$/,
+	rquickExpr = /^(?:#([\w-]+)|(\.?[\w-]+))$/,
 
 	// Used for iframes; see `setDocument`.
 	// Support: IE 9 - 11+
@@ -126,14 +126,16 @@ function find( selector, context, results, seed ) {
 						}
 					}
 
-				// Type selector
+				// Type or class selector
 				} else if ( match[ 2 ] ) {
-					push.apply( results, context.getElementsByTagName( selector ) );
-					return results;
 
-				// Class selector
-				} else if ( ( m = match[ 3 ] ) && context.getElementsByClassName ) {
-					push.apply( results, context.getElementsByClassName( m ) );
+					// `querySelectorAll` is, depending on the browser, either on par
+					// perf-wise with `getElementsByTagName` & `getElementsByClassName`
+					// or even faster, so we don't use `gEBTN` & `gEBCN` anymore.
+					// Note: we can only get tags & classes matching `[\w-]+` here thanks
+					// to `rquickExpr`, so there's no need to wrap them with
+					// `jQuery.escapeSelector`.
+					push.apply( results, context.querySelectorAll( selector ) );
 					return results;
 				}
 			}
@@ -386,19 +388,15 @@ jQuery.expr = {
 		},
 
 		TAG: function( tag, context ) {
-			if ( typeof context.getElementsByTagName !== "undefined" ) {
-				return context.getElementsByTagName( tag );
-
-				// DocumentFragment nodes don't have gEBTN
-			} else {
-				return context.querySelectorAll( tag );
-			}
+			return context.querySelectorAll(
+				tag === "*" ? tag : jQuery.escapeSelector( tag )
+			);
 		},
 
 		CLASS: function( className, context ) {
-			if ( typeof context.getElementsByClassName !== "undefined" && documentIsHTML ) {
-				return context.getElementsByClassName( className );
-			}
+			return context.querySelectorAll(
+				"." + jQuery.escapeSelector( className )
+			);
 		}
 	},
 
