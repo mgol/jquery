@@ -28,40 +28,40 @@ jobs:
           cache: npm
           cache-dependency-path: '**/package-lock.json'
 
+      - name: Disable AppArmor restrictions
+        run: |
+          # Chrome for Testing binaries need unprivileged user namespaces
+          # to set up their sandbox. On Ubuntu 23.10+, AppArmor restricts
+          # this by default, causing Chrome to crash. Disable the restriction.
+          # See: https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          fi
+
       - name: Install Chrome Beta
         run: |
-          # Chrome Beta from `@puppeteer/browsers` is a Chrome for Testing build.
-          # This version lacks the sandbox setup that the APT-packaged Chrome has,
-          # causing crashes on Ubuntu 23.10+ due to AppArmor restrictions.
-          # Because of that, install Chrome Beta from Google's official APT repo.
-          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-beta
+          # Install Chrome Beta (Chrome for Testing build) via @puppeteer/browsers.
+          # The output format is: "chrome@<version> <path>"
+          CHROME_INSTALL_OUTPUT=$(npx @puppeteer/browsers install chrome@beta)
+          CHROME_BIN=$(echo "$CHROME_INSTALL_OUTPUT" | grep "^chrome@" | cut -d' ' -f2-)
+          echo "Chrome Beta installed at: $CHROME_BIN"
 
-      - name: Install ChromeDriver Beta
-        run: |
-          # ChromeDriver is not available in the APT repo, so let's install
-          # it using `@puppeteer/browsers`.
-          CHROME_VERSION=$(google-chrome-beta --version | grep -oP '\d+\.\d+\.\d+\.\d+')
-          echo "Chrome Beta version: $CHROME_VERSION"
-
-          # Install matching ChromeDriver using @puppeteer/browsers
+          # Install matching ChromeDriver via @puppeteer/browsers.
           # The output format is: "chromedriver@<version> <path>"
-          INSTALL_OUTPUT=$(npx @puppeteer/browsers install chromedriver@$CHROME_VERSION)
-          CHROMEDRIVER_PATH=$(echo "$INSTALL_OUTPUT" | grep "^chromedriver@" | cut -d' ' -f2)
-          echo "ChromeDriver installed at: $CHROMEDRIVER_PATH"
+          CHROMEDRIVER_INSTALL_OUTPUT=$(npx @puppeteer/browsers install chromedriver@beta)
+          CHROMEDRIVER_BIN=$(echo "$CHROMEDRIVER_INSTALL_OUTPUT" | grep "^chromedriver@" | cut -d' ' -f2-)
+          echo "ChromeDriver installed at: $CHROMEDRIVER_BIN"
 
           # Add ChromeDriver directory to PATH (prepend to override system chromedriver)
-          CHROMEDRIVER_DIR=$(dirname "$CHROMEDRIVER_PATH")
+          CHROMEDRIVER_DIR=$(dirname "$CHROMEDRIVER_BIN")
           echo "PATH=$CHROMEDRIVER_DIR:$PATH" >> "$GITHUB_ENV"
 
-          # Set Chrome binary
-          echo "CHROME_BIN=$(which google-chrome-beta)" >> "$GITHUB_ENV"
+          # Set Chrome binary for the test runner
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
 
           # Verify installations
-          google-chrome-beta --version
-          "$CHROMEDRIVER_PATH" --version
+          "$CHROME_BIN" --version
+          "$CHROMEDRIVER_BIN" --version
 
       - name: Install dependencies
         run: npm ci
