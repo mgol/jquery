@@ -59,7 +59,7 @@ fi
 cd -
 
 # Restore AUTHORS URL
-sed -i '' -e "s|$1/AUTHORS.txt|main/AUTHORS.txt|" package.json
+sed -i '' -e "s|$1/AUTHORS.txt|3.x-stable/AUTHORS.txt|" package.json
 git add package.json
 
 # Remove built files from tracking.
@@ -69,8 +69,8 @@ git add package.json
 npm run build:clean
 git rm --cached -r dist/ dist-module/
 git add dist/package.json dist/wrappers dist-module/package.json dist-module/wrappers
-git commit -S -m "Release: remove dist files from main branch"
+git commit -S -m "Release: remove dist files from 3.x-stable branch"
 
 # Wait for confirmation from user to push changes
-read -p "Press enter to push changes to main branch"
+read -p "Press enter to push changes to 3.x-stable branch"
 git push

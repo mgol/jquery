@@ -16,7 +16,7 @@ module.exports = {
 	hooks: {
 		"before:init": "./build/release/pre-release.sh",
 		"after:version:bump":
-			"sed -i '' -e 's|main/AUTHORS.txt|${version}/AUTHORS.txt|' package.json",
+			"sed -i '' -e 's|3.x-stable/AUTHORS.txt|${version}/AUTHORS.txt|' package.json",
 		"after:bump": "cross-env VERSION=${version} npm run build:all",
 		"before:git:release": "git add -f dist/ dist-module/ changelog.md",
 		"after:release": "echo 'Run the following to complete the release:' && " +
@@ -30,7 +30,7 @@ module.exports = {
 		commitMessage: "Release: ${version}",
 		getLatestTagFromAllRefs: true,
 		pushRepo: "git@github.com:jquery/jquery.git",
-		requireBranch: "main",
+		requireBranch: "3.x-stable",
 		requireCleanWorkingDir: true,
 		commit: true,
 		commitArgs: [ "-S" ],
