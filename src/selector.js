@@ -1146,7 +1146,7 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 	var bySet = setMatchers.length > 0,
 		byElement = elementMatchers.length > 0,
 		superMatcher = function( seed, context, xml, results, outermost ) {
-			var elem, j, matcher,
+			var elem, j,
 				matchedCount = 0,
 				i = "0",
 				unmatched = seed && [],
@@ -1169,9 +1169,8 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 			}
 
 			// Add elements passing elementMatchers directly to results
-			for ( ; ( elem = elems[ i ] ) != null; i++ ) {
+			for ( j = 0; ( elem = elems[ i ] ) != null; i++ ) {
 				if ( byElement && elem ) {
-
 					// Support: IE 11+
 					// IE sometimes throws a "Permission denied" error when strict-comparing
 					// two documents; shallow comparisons work.
@@ -1180,10 +1179,8 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 						setDocument( elem );
 						xml = !documentIsHTML;
 					}
-					matcher = undefined;
 					for ( j = 0; j < elementMatchers.length; j++ ) {
 						if ( elementMatchers[ j ]( elem, context || document, xml ) ) {
-							matcher = elementMatchers[ j ];
 							push.call( results, elem );
 							break;
 						}
@@ -1197,7 +1194,7 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 				if ( bySet ) {
 
 					// They will have gone through all possible matchers
-					if ( ( elem = !matcher && elem ) ) {
+					if ( ( elem = j >= elementMatchers.length && elem ) ) {
 						matchedCount--;
 					}
 
@@ -1221,8 +1218,7 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 			// numerically zero.
 			if ( bySet && i !== matchedCount ) {
 				for ( j = 0; j < setMatchers.length; j++ ) {
-					matcher = setMatchers[ j ];
-					matcher( unmatched, setMatched, context, xml );
+					setMatchers[ j ]( unmatched, setMatched, context, xml );
 				}
 
 				if ( seed ) {
