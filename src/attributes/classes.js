@@ -37,9 +37,8 @@ jQuery.fn.extend( {
 
 				if ( cur ) {
 					for ( i = 0; i < classNames.length; i++ ) {
-						className = classNames[ i ];
-						if ( cur.indexOf( " " + className + " " ) < 0 ) {
-							cur += className + " ";
+						if ( cur.indexOf( " " + classNames[ i ] + " " ) < 0 ) {
+							cur += classNames[ i ] + " ";
 						}
 					}
 
@@ -79,11 +78,9 @@ jQuery.fn.extend( {
 
 				if ( cur ) {
 					for ( i = 0; i < classNames.length; i++ ) {
-						className = classNames[ i ];
-
 						// Remove *all* instances
-						while ( cur.indexOf( " " + className + " " ) > -1 ) {
-							cur = cur.replace( " " + className + " ", " " );
+						while ( cur.indexOf( " " + classNames[ i ] + " " ) > -1 ) {
+							cur = cur.replace( " " + classNames[ i ] + " ", " " );
 						}
 					}
 
@@ -124,13 +121,11 @@ jQuery.fn.extend( {
 				self = jQuery( this );
 
 				for ( i = 0; i < classNames.length; i++ ) {
-					className = classNames[ i ];
-
 					// Check each className given, space separated list
-					if ( self.hasClass( className ) ) {
-						self.removeClass( className );
+					if ( self.hasClass( classNames[ i ] ) ) {
+						self.removeClass( classNames[ i ] );
 					} else {
-						self.addClass( className );
+						self.addClass( classNames[ i ] );
 					}
 				}
 			} );
