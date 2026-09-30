@@ -1,9 +1,9 @@
-name: Browserstack
+name: Browserstack Firefox diagnostics
 
 on:
   push:
     branches:
-      - main
+      - mgol-tmp-firefox-test
 
 permissions:
   contents: read # to fetch code (actions/checkout)
@@ -24,26 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         BROWSER:
-          - 'IE_11'
-          # BrowserStack makes Safari on beta macOS versions available without marking
-          # either the OS or the browser as beta, so we have no way to resolve "latest"
-          # to the lastest stable version. Given that major Safari version updates
-          # only come once a year, we'll just keep updating them each year, together
-          # with related iOS versions.
-          - 'Safari_27'
-          - 'Safari_26'
-          - 'Chrome_latest'
-          - 'Chrome_latest-1'
-          - 'Opera_latest'
-          - 'Edge_latest'
-          - 'Edge_latest-1'
-          - 'Firefox_latest'
-          - 'Firefox_latest-1'
-          - '_:iPhone 18 Pro_iOS_27'
-          - '_:iPhone 17_iOS_26'
-          - '_:iPhone 16_iOS_18'
-          - '_:iPad 10th_iOS_27'
-          - '_:iPad Pro 11 2025_iOS_26'
+          - 'Firefox_155_Windows_11'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,6 +39,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Patch installed jquery-test-runner for Local logging
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          const path = "node_modules/jquery-test-runner/browserstack/local.js";
+          const source = readFileSync( path, "utf8" );
+          const anchor = '"enable-logging-for-api": "",';
+          assert.equal( source.split( anchor ).length, 2, "Unexpected runner source" );
+          writeFileSync( path, source.replace( anchor,
+            `${ anchor }\n\t\t\t\tverbose: 3,\n\t\t\t\tlogFile: "local.log",`
+          ) );
+          NODE
+
       - name: Build jQuery
         run: npm run build:all
 
@@ -65,7 +61,41 @@ jobs:
         run: npm run pretest
 
       - name: Run tests
+        # Leave time for diagnostics upload if the runner hangs.
+        timeout-minutes: 25
         run: |
           npm run test:unit -- -v -c jtr-isolate.yml \
             --browserstack "${{ matrix.BROWSER }}" \
             --run-id ${{ github.run_id }}
+
+      - name: Collect BrowserStack version and run details
+        if: always()
+        env:
+          BROWSER: ${{ matrix.BROWSER }}
+        run: |
+          mkdir -p tmp
+          {
+            echo "GitHub run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Run ID: $GITHUB_RUN_ID"
+            echo "Attempt: $GITHUB_RUN_ATTEMPT"
+            echo "Commit: $GITHUB_SHA"
+            echo "Browser: $BROWSER"
+            npm ls jquery-test-runner browserstack-local || true
+            for binary in "$HOME/.browserstack/BrowserStackLocal" "$PWD/BrowserStackLocal" "${TMPDIR:-/tmp}/BrowserStackLocal"; do
+              if [ -x "$binary" ]; then
+                "$binary" --version
+                break
+              fi
+            done
+          } > tmp/browserstack-info.txt 2>&1
+          cat tmp/browserstack-info.txt
+
+      - name: Upload BrowserStack diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: browserstack-${{ matrix.BROWSER }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            local.log
+            tmp/browserstack-info.txt
+          retention-days: 14
